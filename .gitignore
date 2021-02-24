@@ -962,3 +962,5 @@
 .venv/share/python-wheels/webencodings-0.5.1-py2.py3-none-any.whl
 .venv/share/python-wheels/wheel-0.32.3-py2.py3-none-any.whl
 .vscode/settings.json
+temp-log.txt
+test.py
