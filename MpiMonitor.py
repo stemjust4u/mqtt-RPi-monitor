@@ -5,20 +5,20 @@ from pathlib import Path
 import paho.mqtt.client as mqtt
 import sys, re, json
 
-class PiMonitor():                                       # Pi T
+class PiMonitor():                                       # Pi Monitor object
     def __init__(self, logFile):
-        # Initialize
-        self.logDir = path.dirname(__file__)
+    # Initialize
+        self.logDir = path.dirname(__file__)             # Setup log file
         self.logFile = logFile
         Path(path.join(self.logDir, self.logFile)).touch(exist_ok = True)
-        self.vcgm = Vcgencmd()
+        self.vcgm = Vcgencmd()                           # Create vcgm object
 
-    # Update log
+    # Update log with date and temperature
     def update_log(self, temp):
         with open(path.join(self.logDir, self.logFile), "a") as log:
             log.write("{0},{1}\n".format(strftime("%Y-%m-%d %H:%M:%S"),str(temp)))
 
-    # Get temperature
+    # Get temperature using vcgm
     def get_temp(self):
         temp = self.vcgm.measure_temp()
         return temp
@@ -40,7 +40,13 @@ if __name__ == "__main__":
     WIFI_SSID = stem[2]                           # Replace with your wifi SSID
     WIFI_PASSWORD = stem[3]                       # Replace with your wifi password
 
-    # Define mqtt callback functions then link them to the mqtt callback below in main program
+    #====== MQTT CALLBACK FUNCTIONS ==========#
+    # Each callback function needs to be 1) defined and 2) assigned/linked in main program below
+    # 3 Functions
+    # on_connect = Connect to the broker and subscribe to TOPICs
+    # on_message = When a message is received get the contents and assign it to a python dictionary (must be subscribed to the TOPIC)
+    # on_publish = Send a message to the broker
+
     # on connect callback verify a connection established and subscribe to TOPICs
     def on_connect(client, userdata, flags, rc):
         print("attempting on_connect")
@@ -60,8 +66,8 @@ if __name__ == "__main__":
             3: Connection refused: Server unavailable
             4: Connection refused: Bad user name or password
             5: Connection refused: Not authorized '''
-            
-    # on message callback will receive messages from the server/broker. Must be subscribed to the topic in "on_connect" 
+
+    # on message callback will receive messages from the server/broker. Must be subscribed to the topic in "on_connect"
     def on_message(client, userdata, msg):
         global dummy1, dummy2 # can define global variables
         #print(msg.topic + ": " + str(msg.payload)) # Uncomment for debugging
@@ -75,26 +81,30 @@ if __name__ == "__main__":
         pass
 
     #==== start/bind mqtt functions ===========#
-    mqtt.Client.connected = False         # Flag for initial connection (different than mqtt.Client.is_connected)
-    mqtt.Client.failed_connection = False # Flag for failed initial connection
-    mqtt_client = mqtt.Client(MQTT_CLIENT_ID)
-    mqtt_client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
-    mqtt_client.on_connect = on_connect  #bind call back function
-    mqtt_client.on_message = on_message  #bind function to be used when PUBLISH messages are found
-    mqtt_client.on_publish = on_publish  #bind function for publishing
-    mqtt_client.loop_start()   # other option is client.loop_forever() but it is blocking
+    # Create a couple flags to handle a failed attempt at connecting. If our user/password is wrong we want to stop the loop.
+    mqtt.Client.connected = False          # Flag for initial connection (different than mqtt.Client.is_connected)
+    mqtt.Client.failed_connection = False  # Flag for failed initial connection
+    # Create our mqtt_client object and bind/link to our callback functions
+    mqtt_client = mqtt.Client(MQTT_CLIENT_ID) # Create mqtt_client object
+    mqtt_client.username_pw_set(MQTT_USER, MQTT_PASSWORD) # Need user/password to connect to broker
+    mqtt_client.on_connect = on_connect    # Bind on connect
+    mqtt_client.on_message = on_message    # Bind on message
+    mqtt_client.on_publish = on_publish    # Bind on publish
+    mqtt_client.loop_start()               # Start monitoring loop as asynchronous. Starts a new thread and will process incoming/outgoing messages.
     print("Connecting to: {0}".format(MQTT_SERVER))
-    mqtt_client.connect(MQTT_SERVER, 1883)  # connect to the mqtt. this is a blocking function. script will stop while connecting.
+    mqtt_client.connect(MQTT_SERVER, 1883) # Connect to mqtt broker. This is a blocking function. Script will stop while connecting.
+    # Monitor if we're in process of connecting or if the connection failed
     while not mqtt_client.connected and not mqtt_client.failed_connection:
         print("Waiting")
         sleep(1)
-    if mqtt_client.failed_connection:
+    if mqtt_client.failed_connection:      # If connection failed then stop the loop and main program. Use the rc code to trouble shoot
         mqtt_client.loop_stop()
         sys.exit()
 
-    pi1 = PiMonitor("temp-log.txt")
-    while True:
-        cpuTemp = pi1.get_temp()
-        mqtt_client.publish(MQTT_PUB_TOPIC1, str(cpuTemp)) 
-        pi1.update_log(cpuTemp)
-        sleep(1)
+    # MQTT setup is successful. Start the Pi Monitor program.
+    pi1 = PiMonitor("temp-log.txt")        # Create pi monitor object and pass the name of our log file
+    while True:                            # Main loop
+        cpuTemp = pi1.get_temp()           # Get the temperature
+        mqtt_client.publish(MQTT_PUB_TOPIC1, str(cpuTemp)) # Publish the temperature to the broker
+        pi1.update_log(cpuTemp)            # Call update_log function
+        sleep(5)                           
