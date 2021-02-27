@@ -102,9 +102,11 @@ if __name__ == "__main__":
         sys.exit()
 
     # MQTT setup is successful. Start the Pi Monitor program.
-    pi1 = PiMonitor("temp-log.txt")        # Create pi monitor object and pass the name of our log file
-    while True:                            # Main loop
-        cpuTemp = pi1.get_temp()           # Get the temperature
-        mqtt_client.publish(MQTT_PUB_TOPIC1, str(cpuTemp)) # Publish the temperature to the broker
-        pi1.update_log(cpuTemp)            # Call update_log function
+    pi1 = PiMonitor("temp-log.txt")          # Create pi monitor object and pass the name of our log file
+    while True:                              # Main loop
+        cpuTemp = pi1.get_temp()             # Get the temperature
+        cpuTempD = {"cpuTempi":str(cpuTemp)} # Put the temp in a Python dictionary for easy json conversion 
+        cpuTempJ = json.dumps(cpuTempD)   # Convert python dictionary to json format. json is a useful format for mqtt communication.
+        mqtt_client.publish(MQTT_PUB_TOPIC1, cpuTempJ) # Publish the temperature to the broker
+        pi1.update_log(cpuTemp)              # Call update_log function
         sleep(5)                           
