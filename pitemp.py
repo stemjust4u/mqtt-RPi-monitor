@@ -14,4 +14,5 @@ while True:
     cpuTemp = vcgm.measure_temp()
     with open(path.join(logDir, logFile), "a") as log:
         log.write("{0},{1}\n".format(strftime("%Y-%m-%d %H:%M:%S"),str(cpuTemp)))
+        print(cpuTemp)
     sleep(1)
